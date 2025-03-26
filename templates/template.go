@@ -1,11 +1,35 @@
 package templates
 
 import (
+	"errors"
 	"github.com/chainreactors/neutron/protocols"
 	"github.com/chainreactors/neutron/protocols/executer"
 	"github.com/chainreactors/neutron/protocols/http"
 	"github.com/chainreactors/neutron/protocols/network"
+	"gopkg.in/yaml.v3"
 )
+
+type StringOrSlice struct {
+	Value []string
+}
+
+func (m *StringOrSlice) UnmarshalYAML(node *yaml.Node) error {
+	var s string
+	if err := node.Decode(&s); err == nil {
+		m.Value = []string{s}
+		return nil
+	}
+	var ss []string
+	if err := node.Decode(&ss); err == nil {
+		m.Value = ss
+		return nil
+	}
+	return errors.New("failed to unmarshal StringOrSlice")
+}
+
+func (m *StringOrSlice) MarshalYAML() (interface{}, error) {
+	return m.Value, nil
+}
 
 type Template struct {
 	Id      string   `json:"id" yaml:"id"`
@@ -13,14 +37,15 @@ type Template struct {
 	Chains  []string `json:"chain" yaml:"chain"`
 	Opsec   bool     `json:"opsec" yaml:"opsec"`
 	Info    struct {
-		Name string `json:"name" yaml:"name"`
-		//Author    string `json:"author"`
-		Severity    string `json:"severity" yaml:"severity"`
-		Description string `json:"description" yaml:"description"`
-		//Reference string `json:"reference"`
-		//Vendor    string `json:"vendor"`
-		Tags   string `json:"tags" yaml:"tags"`
-		Zombie string `json:"zombie" yaml:"zombie"`
+		Name        string                 `json:"name" yaml:"name"`
+		Author      string                 `json:"author"`
+		Severity    string                 `json:"severity" yaml:"severity"`
+		Description string                 `json:"description" yaml:"description"`
+		Reference   StringOrSlice          `json:"reference"`
+		Vendor      string                 `json:"vendor"`
+		Tags        string                 `json:"tags" yaml:"tags"`
+		Zombie      string                 `json:"zombie" yaml:"zombie"`
+		Metadata    map[string]interface{} `json:"metadata" yaml:"metadata"`
 	} `json:"info" yaml:"info"`
 
 	Variables protocols.Variable `yaml:"variables,omitempty" json:"variables,omitempty"`

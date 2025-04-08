@@ -1,7 +1,10 @@
 package templates
 
 import (
+	"encoding/json"
 	"errors"
+	"strings"
+
 	"github.com/chainreactors/neutron/protocols"
 	"github.com/chainreactors/neutron/protocols/executer"
 	"github.com/chainreactors/neutron/protocols/http"
@@ -29,6 +32,26 @@ func (m *StringOrSlice) UnmarshalYAML(node *yaml.Node) error {
 
 func (m *StringOrSlice) MarshalYAML() (interface{}, error) {
 	return m.Value, nil
+}
+
+// 自定义JSON序列化
+func (m *StringOrSlice) MarshalJSON() ([]byte, error) {
+	s := strings.Join(m.Value, ",")
+	return json.Marshal(s)
+}
+
+func (m *StringOrSlice) UnmarshalJSON(data []byte) error {
+	var ss []string
+	if err := json.Unmarshal(data, &ss); err == nil {
+		m.Value = ss
+		return nil
+	}
+	var s string
+	if err := json.Unmarshal(data, &s); err == nil {
+		m.Value = []string{s}
+		return nil
+	}
+	return errors.New("failed to unmarshal StringOrSlice")
 }
 
 type Template struct {

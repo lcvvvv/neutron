@@ -1,16 +1,18 @@
 package network
 
 import (
+	"context"
 	"encoding/hex"
 	"errors"
-	"github.com/chainreactors/neutron/common"
-	"github.com/chainreactors/neutron/operators"
-	protocols "github.com/chainreactors/neutron/protocols"
 	"io"
 	"net"
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/chainreactors/neutron/common"
+	"github.com/chainreactors/neutron/operators"
+	protocols "github.com/chainreactors/neutron/protocols"
 )
 
 var _ protocols.Request = &Request{}
@@ -80,6 +82,11 @@ func (r *Request) ExecuteWithResults(input *protocols.ScanContext, dynamicValues
 	if err != nil {
 		return err
 	}
+
+	if input.DialContext == nil {
+		input.DialContext = r.dialer.DialContext
+	}
+
 	dynamicValues = common.MergeMaps(dynamicValues, map[string]interface{}{"Hostname": address})
 	for _, kv := range r.addresses {
 		variables := generateNetworkVariables(address)
@@ -120,21 +127,21 @@ func (r *Request) executeAddress(input *protocols.ScanContext, variables map[str
 				break
 			}
 			value = common.MergeMaps(value, payloads)
-			if err := r.executeRequestWithPayloads(variables, actualAddress, address, input.Input, shouldUseTLS, value, dynamicValues, callback); err != nil {
+			if err := r.executeRequestWithPayloads(variables, actualAddress, address, input, shouldUseTLS, value, dynamicValues, callback); err != nil {
 				return err
 			}
 		}
 	} else {
 		value := protocols.CopyMap(payloads)
 
-		if err := r.executeRequestWithPayloads(variables, actualAddress, address, input.Input, shouldUseTLS, value, dynamicValues, callback); err != nil {
+		if err := r.executeRequestWithPayloads(variables, actualAddress, address, input, shouldUseTLS, value, dynamicValues, callback); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (r *Request) executeRequestWithPayloads(variables map[string]interface{}, actualAddress, address, input string, shouldUseTLS bool, payloads map[string]interface{}, dynamicValues map[string]interface{}, callback protocols.OutputEventCallback) error {
+func (r *Request) executeRequestWithPayloads(variables map[string]interface{}, actualAddress, address string, input *protocols.ScanContext, shouldUseTLS bool, payloads map[string]interface{}, dynamicValues map[string]interface{}, callback protocols.OutputEventCallback) error {
 	var (
 		//hostname string
 		conn net.Conn
@@ -148,7 +155,7 @@ func (r *Request) executeRequestWithPayloads(variables map[string]interface{}, a
 	if shouldUseTLS {
 		//conn, err = r.dialer.DialTLS(context.Background(), "tcp", actualAddress)
 	} else {
-		conn, err = r.dialer.Dial("tcp", actualAddress)
+		conn, err = input.DialContext(context.Background(), "tcp", actualAddress)
 	}
 	if err != nil {
 		return err

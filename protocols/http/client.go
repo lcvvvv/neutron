@@ -43,6 +43,49 @@ var DefaultTransport = &http.Transport{
 	Proxy:               DefaultOption.Proxy,
 }
 
+func cloneClient(client *http.Client) *http.Client {
+	if client == nil {
+		client = createClient(&DefaultOption)
+	}
+
+	return &http.Client{
+		Transport:     cloneTransport(client.Transport.(*http.Transport)),
+		CheckRedirect: client.CheckRedirect,
+		Jar:           client.Jar,
+		Timeout:       client.Timeout,
+	}
+}
+
+func cloneTransport(t *http.Transport) *http.Transport {
+	t2 := &http.Transport{
+		Proxy:                  t.Proxy,
+		OnProxyConnectResponse: t.OnProxyConnectResponse,
+		DialContext:            t.DialContext,
+		Dial:                   t.Dial,
+		DialTLS:                t.DialTLS,
+		DialTLSContext:         t.DialTLSContext,
+		TLSHandshakeTimeout:    t.TLSHandshakeTimeout,
+		DisableKeepAlives:      t.DisableKeepAlives,
+		DisableCompression:     t.DisableCompression,
+		MaxIdleConns:           t.MaxIdleConns,
+		MaxIdleConnsPerHost:    t.MaxIdleConnsPerHost,
+		MaxConnsPerHost:        t.MaxConnsPerHost,
+		IdleConnTimeout:        t.IdleConnTimeout,
+		ResponseHeaderTimeout:  t.ResponseHeaderTimeout,
+		ExpectContinueTimeout:  t.ExpectContinueTimeout,
+		ProxyConnectHeader:     t.ProxyConnectHeader.Clone(),
+		GetProxyConnectHeader:  t.GetProxyConnectHeader,
+		MaxResponseHeaderBytes: t.MaxResponseHeaderBytes,
+		ForceAttemptHTTP2:      t.ForceAttemptHTTP2,
+		WriteBufferSize:        t.WriteBufferSize,
+		ReadBufferSize:         t.ReadBufferSize,
+	}
+	if t.TLSClientConfig != nil {
+		t2.TLSClientConfig = t.TLSClientConfig.Clone()
+	}
+	return t2
+}
+
 func createClient(opt *Configuration) *http.Client {
 	var tr *http.Transport = DefaultTransport
 

@@ -3,6 +3,9 @@ package protocols
 import (
 	"context"
 	"fmt"
+	"net"
+	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 )
@@ -21,6 +24,13 @@ type ScanContext struct {
 	warnings []string
 	events   []*InternalWrappedEvent
 
+	// scanConfig
+	ProxyURL    func(req *http.Request) (*url.URL, error)
+	DialContext func(ctx context.Context, network, addr string) (net.Conn, error)
+
+	// httpClient
+	httpClient *http.Client
+
 	// might not be required but better to sync
 	m sync.Mutex
 }
@@ -28,6 +38,21 @@ type ScanContext struct {
 // NewScanContext creates a new scan context using input
 func NewScanContext(input string, payloads map[string]interface{}) *ScanContext {
 	return &ScanContext{Input: input, Payloads: payloads}
+}
+
+func (s *ScanContext) SetHttpCleint(cli *http.Client) {
+	s.httpClient = cli
+	if s.ProxyURL != nil {
+		s.httpClient.Transport.(*http.Transport).Proxy = s.ProxyURL
+		return
+	}
+	if s.DialContext != nil {
+		s.httpClient.Transport.(*http.Transport).DialContext = s.DialContext
+	}
+}
+
+func (s *ScanContext) HttpClient() *http.Client {
+	return s.httpClient
 }
 
 // GenerateResult returns final results slice from all events

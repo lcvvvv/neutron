@@ -1,10 +1,11 @@
 package network
 
 import (
-	"github.com/chainreactors/neutron/operators"
-	protocols "github.com/chainreactors/neutron/protocols"
 	"net"
 	"strings"
+
+	"github.com/chainreactors/neutron/operators"
+	protocols "github.com/chainreactors/neutron/protocols"
 )
 
 // Request contains a Network protocol request to be made from a template

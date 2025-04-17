@@ -5,15 +5,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/chainreactors/neutron/common"
-	"github.com/chainreactors/neutron/operators"
-	"github.com/chainreactors/neutron/protocols"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/chainreactors/neutron/common"
+	"github.com/chainreactors/neutron/operators"
+	"github.com/chainreactors/neutron/protocols"
 )
 
 var errStopExecution = errors.New("stop execution due to unresolved variables")
@@ -300,6 +301,8 @@ func (r *Request) Compile(options *protocols.ExecuterOptions) error {
 func (r *Request) ExecuteWithResults(input *protocols.ScanContext, dynamicValues, previous map[string]interface{}, callback protocols.OutputEventCallback) error {
 	var err error
 
+	input.SetHttpCleint(cloneClient(r.httpClient))
+
 	err = r.ExecuteRequestWithResults(input, dynamicValues, previous, callback)
 	if err != nil {
 		return err
@@ -387,7 +390,7 @@ func (r *Request) ExecuteRequestWithResults(input *protocols.ScanContext, dynami
 
 func (r *Request) executeRequest(input *protocols.ScanContext, request *generatedRequest, previousEvent map[string]interface{}, callback protocols.OutputEventCallback, reqcount int) error {
 	timeStart := time.Now()
-	resp, err := r.httpClient.Do(request.request)
+	resp, err := input.HttpClient().Do(request.request)
 	common.Debug("request %s %v %v", request.request.Method, request.request.URL, request.dynamicValues)
 	common.Dump(request.request)
 	if err != nil {

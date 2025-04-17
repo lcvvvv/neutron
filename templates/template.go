@@ -3,7 +3,6 @@ package templates
 import (
 	"encoding/json"
 	"errors"
-	"strings"
 
 	"github.com/chainreactors/neutron/protocols"
 	"github.com/chainreactors/neutron/protocols/executer"
@@ -13,42 +12,41 @@ import (
 )
 
 type StringOrSlice struct {
-	Value []string
+	value []string
 }
 
 func (m *StringOrSlice) UnmarshalYAML(node *yaml.Node) error {
 	var s string
 	if err := node.Decode(&s); err == nil {
-		m.Value = []string{s}
+		m.value = []string{s}
 		return nil
 	}
 	var ss []string
 	if err := node.Decode(&ss); err == nil {
-		m.Value = ss
+		m.value = ss
 		return nil
 	}
 	return errors.New("failed to unmarshal StringOrSlice")
 }
 
 func (m *StringOrSlice) MarshalYAML() (interface{}, error) {
-	return m.Value, nil
+	return m.value, nil
 }
 
 // 自定义JSON序列化
 func (m *StringOrSlice) MarshalJSON() ([]byte, error) {
-	s := strings.Join(m.Value, ",")
-	return json.Marshal(s)
+	return json.Marshal(m.value)
 }
 
 func (m *StringOrSlice) UnmarshalJSON(data []byte) error {
 	var ss []string
 	if err := json.Unmarshal(data, &ss); err == nil {
-		m.Value = ss
+		m.value = ss
 		return nil
 	}
 	var s string
 	if err := json.Unmarshal(data, &s); err == nil {
-		m.Value = []string{s}
+		m.value = []string{s}
 		return nil
 	}
 	return errors.New("failed to unmarshal StringOrSlice")
@@ -59,11 +57,11 @@ type Template struct {
 	Opsec bool   `json:"opsec" yaml:"opsec"`
 	Info  struct {
 		Name        string                 `json:"name" yaml:"name"`
-		Author      string                 `json:"author"`
+		Author      string                 `json:"author" yaml:"author"`
 		Severity    string                 `json:"severity" yaml:"severity"`
 		Description string                 `json:"description" yaml:"description"`
-		Reference   StringOrSlice          `json:"reference"`
-		Vendor      string                 `json:"vendor"`
+		Reference   *StringOrSlice         `json:"reference" yaml:"reference"`
+		Vendor      string                 `json:"vendor" yaml:"vendor"`
 		Tags        string                 `json:"tags" yaml:"tags"`
 		Zombie      string                 `json:"zombie" yaml:"zombie"`
 		Metadata    map[string]interface{} `json:"metadata" yaml:"metadata"`

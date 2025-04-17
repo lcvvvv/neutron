@@ -8,6 +8,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"net/http/httputil"
 	"regexp"
 	"strings"
 	"time"
@@ -462,8 +463,10 @@ func (r *Request) responseToDSLMap(req *http.Request, resp *http.Response, host,
 	for k, v := range resp.Header {
 		k = strings.ToLower(strings.Replace(strings.TrimSpace(k), "-", "_", -1))
 		data[k] = strings.Join(v, " ")
-		data["all_headers"] = common.ToString(data["all_headers"]) + fmt.Sprintf("%s: %s\r\n", k, v)
 	}
+
+	headersBuff, _ := httputil.DumpResponse(resp, false)
+	data["all_headers"] = string(headersBuff)
 
 	body, _ := ioutil.ReadAll(resp.Body)
 	_ = resp.Body.Close()

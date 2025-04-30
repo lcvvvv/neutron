@@ -34,13 +34,12 @@ func IsExist(filename string) bool {
 }
 
 // MergeMaps merges two maps into a New map
-func MergeMaps(m1, m2 map[string]interface{}) map[string]interface{} {
-	m := make(map[string]interface{}, len(m1)+len(m2))
-	for k, v := range m1 {
-		m[k] = v
-	}
-	for k, v := range m2 {
-		m[k] = v
+func MergeMaps(m1 map[string]interface{}, maps ...map[string]interface{}) map[string]interface{} {
+	m := make(map[string]interface{})
+	for _, subMap := range append(maps, m1) {
+		for k, v := range subMap {
+			m[k] = v
+		}
 	}
 	return m
 }

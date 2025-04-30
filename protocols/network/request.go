@@ -126,9 +126,20 @@ func (r *Request) executeAddress(input *protocols.ScanContext, variables map[str
 			if !ok {
 				break
 			}
+			var gotMatches = false
+			generatorCallback := func(result *protocols.InternalWrappedEvent) {
+				if result.OperatorsResult != nil && result.OperatorsResult.Matched {
+					gotMatches = true
+				}
+				callback(result)
+			}
 			value = common.MergeMaps(value, payloads)
-			if err := r.executeRequestWithPayloads(variables, actualAddress, address, input, shouldUseTLS, value, dynamicValues, callback); err != nil {
+			if err := r.executeRequestWithPayloads(variables, actualAddress, address, input, shouldUseTLS, value, dynamicValues, generatorCallback); err != nil {
 				return err
+			}
+			// If this was a match, and we want to stop at first match, skip all further requests.
+			if r.StopAtFirstMatch && gotMatches {
+				return nil
 			}
 		}
 	} else {
@@ -166,7 +177,7 @@ func (r *Request) executeRequestWithPayloads(variables map[string]interface{}, a
 	responseBuilder := &strings.Builder{}
 	//reqBuilder := &strings.Builder{}
 
-	inputEvents := make(map[string]interface{})
+	inputEvents := common.MergeMaps(variables, dynamicValues, payloads)
 	for _, input := range r.Inputs {
 		var data []byte
 
@@ -181,7 +192,7 @@ func (r *Request) executeRequestWithPayloads(variables map[string]interface{}, a
 		}
 		//reqBuilder.Grow(len(input.Data))
 
-		finalData, err := common.Evaluate(string(data), payloads)
+		finalData, err := common.Evaluate(string(data), inputEvents)
 		if err != nil {
 			return err
 		}
@@ -249,7 +260,7 @@ func (r *Request) executeRequestWithPayloads(variables map[string]interface{}, a
 				buf := make([]byte, bufferSize)
 				nBuf, err := conn.Read(buf)
 				if err != nil {
-					if err == io.EOF {
+					if err == io.EOF || responseBuilder.Len() > 0 {
 						break readSocket
 					} else {
 						return err
@@ -281,9 +292,16 @@ func (r *Request) executeRequestWithPayloads(variables map[string]interface{}, a
 	//for k, v := range inputEvents {
 	//	outputEvent[k] = v
 	//}
-	event := &protocols.InternalWrappedEvent{InternalEvent: dynamicValues}
+	dynamicValues["data"] = responseBuilder.String()
+	if r.StopAtFirstMatch {
+		dynamicValues["stop-at-first-match"] = true
+	}
+
+	outputEvent := common.MergeMaps(dynamicValues, inputEvents)
+	event := &protocols.InternalWrappedEvent{InternalEvent: outputEvent}
+	defer input.LogEvent(event)
 	if r.CompiledOperators != nil {
-		result, ok := r.CompiledOperators.Execute(map[string]interface{}{"data": responseBuilder.String()}, r.Match, r.Extract)
+		result, ok := r.CompiledOperators.Execute(event.InternalEvent, r.Match, r.Extract)
 		if ok && result != nil {
 			event.OperatorsResult = result
 			event.OperatorsResult.PayloadValues = payloads

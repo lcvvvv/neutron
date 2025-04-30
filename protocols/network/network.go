@@ -28,7 +28,8 @@ type Request struct {
 	ReadSize int `json:"read-size" yaml:"read-size"`
 
 	ReadAll bool `json:"read-all" yaml:"read-all"`
-
+	//   StopAtFirstMatch stops the execution of the requests and template as soon as a match is found.
+	StopAtFirstMatch    bool `json:"stop-at-first-match" yaml:"stop-at-first-match"`
 	operators.Operators `json:",inline,omitempty" yaml:",inline,omitempty"`
 	// Operators for the current request go here.
 	CompiledOperators *operators.Operators

@@ -323,7 +323,16 @@ func (e *Extractor) ExtractDSL(data map[string]interface{}) map[string]struct{} 
 	results := make(map[string]struct{})
 
 	for _, compiledExpression := range e.dslCompiled {
-		result, err := compiledExpression.Evaluate(data)
+		resolvedExpression, err := common.Evaluate(compiledExpression.String(), data)
+		if err != nil {
+			return results
+		}
+		expr, err := govaluate.NewEvaluableExpressionWithFunctions(resolvedExpression, common.HelperFunctions)
+		if err != nil {
+			return results
+		}
+
+		result, err := expr.Evaluate(data)
 		// ignore errors that are related to missing parameters
 		// eg: dns dsl can have all the parameters that are not present
 		if err != nil && !strings.HasPrefix(err.Error(), "No parameter") {

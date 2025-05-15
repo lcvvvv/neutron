@@ -5,6 +5,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/chainreactors/neutron/common"
+	"github.com/chainreactors/neutron/common/dsl"
+	"github.com/chainreactors/neutron/operators"
+	"github.com/chainreactors/neutron/protocols"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -12,10 +16,6 @@ import (
 	"regexp"
 	"strings"
 	"time"
-
-	"github.com/chainreactors/neutron/common"
-	"github.com/chainreactors/neutron/operators"
-	"github.com/chainreactors/neutron/protocols"
 )
 
 var errStopExecution = errors.New("stop execution due to unresolved variables")
@@ -54,6 +54,8 @@ type Request struct {
 	CookieReuse bool `json:"cookie-reuse" yaml:"cookie-reuse"`
 	// Redirects specifies whether redirects should be followed.
 	Redirects bool `json:"redirects" yaml:"redirects"`
+	//   This can be used in conjunction with `max-redirects` to control the HTTP request redirects.
+	HostRedirects bool `yaml:"host-redirects,omitempty" json:"host-redirects,omitempty"`
 	// Pipeline defines if the attack should be performed with HTTP 1.1 Pipelining (race conditions/billions requests)
 	// All requests must be indempotent (GET/POST)
 	Unsafe bool `json:"unsafe" yaml:"unsafe"`
@@ -72,7 +74,8 @@ type Request struct {
 	attackType        protocols.Type
 	totalRequests     int
 
-	options *protocols.ExecuterOptions
+	globalVars map[string]interface{}
+	options    *protocols.ExecuterOptions
 	//Result            *protocols.Result
 }
 
@@ -229,13 +232,12 @@ func (r *Request) Requests() int {
 
 func (r *Request) Compile(options *protocols.ExecuterOptions) error {
 	r.options = options
-	var err error
 
 	connectionConfiguration := &Configuration{
 		//Threads:         r.Threads,
 		Timeout:         options.Options.Timeout,
 		MaxRedirects:    r.MaxRedirects,
-		FollowRedirects: r.Redirects,
+		FollowRedirects: r.Redirects || r.HostRedirects,
 		CookieReuse:     r.CookieReuse,
 	}
 	r.httpClient = createClient(connectionConfiguration)
@@ -249,6 +251,11 @@ func (r *Request) Compile(options *protocols.ExecuterOptions) error {
 				r.Raw[i] = strings.Replace(raw, "\n", "\r\n", -1)
 			}
 		}
+	}
+
+	r.globalVars = map[string]interface{}{
+		"randstr": dsl.RandStr(8),
+		"randnum": dsl.RandNum(4),
 	}
 
 	// 修改: 只编译一次Matcher
@@ -288,8 +295,9 @@ func (r *Request) Compile(options *protocols.ExecuterOptions) error {
 				}
 				r.Payloads[k] = tmp
 			}
-
 		}
+
+		var err error
 		r.generator, err = protocols.NewGenerator(r.Payloads, r.attackType)
 		if err != nil {
 			return err
@@ -321,7 +329,7 @@ func (r *Request) ExecuteRequestWithResults(input *protocols.ScanContext, dynami
 	for {
 		// returns two values, error and skip, which skips the execution for the request instance.
 		executeFunc := func(data string, payloads, dynamicValue map[string]interface{}) (bool, error) {
-			generatedHttpRequest, err := generator.Make(input.Input, data, payloads, dynamicValue)
+			generatedHttpRequest, err := generator.Make(input.Input, data, payloads, dynamicValue, r.globalVars)
 			if err != nil {
 				if err == io.EOF {
 					return true, nil
@@ -426,6 +434,7 @@ func (r *Request) executeRequest(input *protocols.ScanContext, request *generate
 			finalEvent[key] = v
 		}
 	}
+	finalEvent = common.MergeMaps(finalEvent, request.Vars())
 	common.Dump(finalEvent)
 
 	event := &protocols.InternalWrappedEvent{InternalEvent: finalEvent}
@@ -551,4 +560,8 @@ type generatedRequest struct {
 	//pipelinedClient *rawhttp.PipelineClient
 	request       *http.Request
 	dynamicValues map[string]interface{}
+}
+
+func (gr *generatedRequest) Vars() map[string]interface{} {
+	return common.MergeMaps(gr.meta, gr.dynamicValues)
 }
